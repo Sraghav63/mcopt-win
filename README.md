@@ -1,8 +1,36 @@
 # mcopt
 
-A Minecraft performance mod for Apple Silicon Macs. **Very much alpha:** expect bugs, and back up your worlds.
+A Minecraft performance mod for Windows 11 and Apple Silicon Macs. **Very much alpha:** expect bugs, and back up your worlds.
 
-## Requirements
+## Windows 11
+
+The Windows port keeps the portable chunk, CPU, memory and startup optimizations and uses Windows thread scheduling.
+Minecraft/Sodium provides the graphics backend. **Matching the Mac performance gains is not established:** Apple's
+Metal renderer, MetalFX/frame generation, native noise and mcopt far terrain have no Windows equivalents in this port.
+Windows gameplay and hardware benchmarks still need validation.
+
+Install `dist/mcopt-windows-0.2.0-alpha.2.jar` alongside the Sodium version below in `%APPDATA%\.minecraft\mods`
+(or your launcher's instance mods folder). Requires 64-bit Java 25+, Minecraft 26.3 and Fabric Loader 0.19.5+.
+The FPS HUD is included. Remove any previous mcopt or separate mcopt-fps jars first.
+
+Build on Windows with JDK 25: `powershell -ExecutionPolicy Bypass -File tools/release-windows.ps1`, or:
+
+```powershell
+.\gradlew.bat -PtargetPlatform=windows :metal:build :fpshud:build :metal:windowsRelease
+```
+
+Cross-build on Mac/Linux using `./gradlew` with the same arguments. Both the jar and a zip with installation instructions
+are written to `dist/`. No Xcode, clang, Python or Apple frameworks are needed for this build.
+
+Windows defaults to `profile=windows`. Its larger chunk cache is enabled only with at least 16 GB system memory and
+2 GB Java heap. Config and JVM overrides for portable optimizations still take precedence; Apple-only hooks stay off.
+`mcopt.qos=off` disables thread scheduling. Java may require `--enable-native-access=ALL-UNNAMED` for native scheduling;
+if unavailable, mcopt logs once and keeps default Windows priorities.
+
+See [WINDOWS-README.txt](WINDOWS-README.txt) for installation and a controlled benchmark procedure. The table below
+contains Mac results only. `profile=none` disables profile settings; QoS and class preload have separate switches.
+
+## Mac requirements
 
 - An Apple Silicon Mac on macOS 26 or later
 - Java 25

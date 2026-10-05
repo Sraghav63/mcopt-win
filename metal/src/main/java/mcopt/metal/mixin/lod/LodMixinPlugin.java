@@ -32,6 +32,7 @@ public final class LodMixinPlugin implements IMixinConfigPlugin {
 
 	@Override
 	public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
+		if (!mcopt.metal.Platform.metalEnabled()) return false;
 		if (mixinClassName.endsWith(".LodSodiumFadeMixin")) return ENABLED && FADE_INSTANT && net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("sodium");
 		return mixinClassName.contains(".LodTruth") ? TRUTH : ENABLED;
 	}

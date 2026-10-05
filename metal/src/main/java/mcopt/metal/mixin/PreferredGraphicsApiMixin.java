@@ -13,7 +13,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 abstract class PreferredGraphicsApiMixin {
 	@Inject(method = "getBackendsToTry", at = @At("RETURN"), cancellable = true)
 	private void mcopt$metalFirst(CallbackInfoReturnable<GpuBackend[]> cir) {
-		if (!Boolean.parseBoolean(System.getProperty("mcopt.metal", "true"))) return;
+		if (!mcopt.metal.Platform.metalEnabled()) return;
 		GpuBackend[] fallbacks = cir.getReturnValue();
 		GpuBackend[] backends = new GpuBackend[fallbacks.length + 1];
 		backends[0] = new MetalBackend();

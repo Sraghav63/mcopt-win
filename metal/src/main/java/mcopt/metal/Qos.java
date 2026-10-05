@@ -10,7 +10,7 @@ import java.util.Map;
 import static java.lang.foreign.ValueLayout.JAVA_INT;
 
 /**
- * Thread QoS roles, on by default (measured on the test Macs): the render thread user-interactive and the integrated
+	* Thread scheduling roles (Windows SetThreadPriority or macOS QoS), on by default (measured on the test Macs): the render thread user-interactive and the integrated
  * server user-initiated; -Dmcopt.qos=off turns them all off (the mixins then don't apply). {@code -Dmcopt.qos.ROLE=CLASS}
  * for ROLE render (the render thread), server (the integrated server thread), mesh (Sodium's chunk builders), cull (Sodium's cull
  * thread), worker (Worker-Main) or io (IO-Worker); CLASS background, utility, default, initiated or interactive. Each thread puts
@@ -61,13 +61,15 @@ public final class Qos {
 	}
 
 	public static boolean has(String role) {
-		return LEVELS.containsKey(role);
+		return (Platform.windows() || System.getProperty("os.name", "").startsWith("Mac")) && LEVELS.containsKey(role);
 	}
 
 	/** Called on a thread of this role from its own body: puts the calling thread in the role's QoS class, if one is set. */
 	public static void self(String role) {
 		Integer cls = LEVELS.get(role);
 		if (cls == null) return;
+		if (Platform.windows()) { WindowsQos.self(role, cls); return; }
+		if (!System.getProperty("os.name", "").startsWith("Mac")) return;
 		try {
 			synchronized (Qos.class) {
 				if (setSelf == null) {

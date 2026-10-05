@@ -11,6 +11,7 @@ public final class TexelViewsSwitch {
 
 	/** The native pass-begin lever (mc_cpu_flags), for AbShots. */
 	public static void pass(boolean on) {
+		if (!Platform.metalEnabled()) return;
 		Native.cpuFlags(mcopt.metal.cpu.Cpu.nativeFlags(on));
 	}
 }

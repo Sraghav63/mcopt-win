@@ -15,6 +15,7 @@ public final class ProbeMixinPlugin implements IMixinConfigPlugin {
 	@Override public void onLoad(String mixinPackage) { }
 	@Override public String getRefMapperConfig() { return null; }
 	@Override public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
+		if (!mcopt.metal.Platform.metalEnabled()) return false;
 		if (mixinClassName.endsWith("PollProbeMixin")) return Boolean.getBoolean("mcopt.metal.latency");
 		return false;
 	}

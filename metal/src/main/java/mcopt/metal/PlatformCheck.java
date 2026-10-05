@@ -4,12 +4,8 @@ import net.fabricmc.loader.impl.gui.FabricGuiEntry;
 import net.fabricmc.loader.impl.util.log.Log;
 import net.fabricmc.loader.impl.util.log.LogCategory;
 
-/**
- * Stops the launch, before any Metal class loads, on a machine the native library can't run on: it is arm64-only and
- * the mod supports macOS 26 and later. The message goes to the log and to Fabric's own error dialog (the one it shows
- * for a missing dependency), then the game exits. A plain exception from preLaunch would only show up as "A mod crashed
- * on startup!" with the reason buried in a stack trace. -Dmcopt.platformCheck.fake=linux (or x86_64, or a macOS
- * version like 15.5) pretends to be that platform, to test the message.
+/** Validates Windows 64-bit Java or the Apple Silicon/macOS requirements before preload starts.
+ * -Dmcopt.platformCheck.fake=linux (or x86_64, or a version such as 15.5) tests the error dialog.
  */
 final class PlatformCheck {
 	private PlatformCheck() {
@@ -25,7 +21,7 @@ final class PlatformCheck {
 		}
 		String problem = problem(os, arch, version);
 		if (problem == null) return;
-		String message = "mcopt Metal can't run here. " + problem
+		String message = "mcopt can't run here. " + problem
 			+ " To play on this computer, remove the mcopt-metal jar from the mods folder.";
 		Log.error(LogCategory.GENERAL, message);
 		try {
@@ -37,6 +33,12 @@ final class PlatformCheck {
 	}
 
 	private static String problem(String os, String arch, String version) {
+		// Windows reports either 10.0 or 11.x depending on the JDK manifest; accept both.
+		if (os.startsWith("Windows")) {
+			if (!java.util.Set.of("amd64", "x86_64", "aarch64", "arm64").contains(arch))
+				return "Windows requires a 64-bit Java 25 runtime; this Java is " + arch + ".";
+			return null;
+		}
 		if (!os.startsWith("Mac")) return "It needs an Apple Silicon Mac (M1 or newer) with macOS 26 or later, and this computer runs " + os + ".";
 		if (!arch.equals("aarch64") && !arch.equals("arm64")) {
 			return "It needs an Apple Silicon Mac (M1 or newer) and an Apple Silicon (arm64) Java, and this Java is " + arch

@@ -1,5 +1,6 @@
 {
 	"required": true,
+ "plugin": "mcopt.metal.mixin.BackendMixinPlugin",
 	"package": "mcopt.metal.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"client": ["CameraFxMixin", "FramerateLimiterMixin", "GameRendererFrameGenMixin", "GameRendererFxMixin", "GuiRendererFrameGenMixin", "PreferredGraphicsApiMixin"],

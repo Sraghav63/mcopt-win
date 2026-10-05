@@ -18,7 +18,7 @@ import java.util.TreeMap;
  * <li>Any {@code mcopt.*} key in config/mcopt.properties is applied too, and wins over the profile's value.</li>
  * <li>A flag given on the command line wins over both: a key is only set when System.getProperty(key) is still null.</li>
  * </ul>
- * With no profile named anywhere, {@code alpha} applies (the perf-only set); {@code profile=none} applies no profile,
+	* With no profile named anywhere, {@code windows} on Windows or {@code alpha} on Mac applies (the perf-only set); {@code profile=none} applies no profile,
  * exactly the old no-profile behaviour. If config/mcopt.properties is absent it is written with the effective profile ({@code alpha}, or what -Dmcopt.profile names)
  * and comment lines on how to turn it off and how to try far terrain. For {@code alpha} on the small tier (GPU under
  * 10 cores, or 8 GB of RAM or less, or either unreadable) the keys in {@link #SMALL_OUT} are left out. It runs first in every mixin config plugin
@@ -37,8 +37,19 @@ public final class Profile {
 	public static synchronized void apply() {
 		if (applied) return;
 		applied = true;
-		applyFlags();
+		applyFlags(gameDir().resolve("config").resolve("mcopt.properties"));
+		platformFlags();
 		distantHorizons();
+	}
+
+	/** Apple-native features remain unavailable even with explicit Windows config overrides. */
+	static void platformFlags() {
+		if (!Platform.windows()) return;
+		// Capability restrictions take precedence even over a copied Mac config or JVM flag.
+		for (String key : java.util.List.of("mcopt.metal", "mcopt.lod", "mcopt.cpu.texelCache", "mcopt.preciseLimiter")) {
+			System.setProperty(key, "false");
+		}
+		System.out.println("[mcopt] Windows: using Minecraft/Sodium graphics backend; portable optimizations follow the selected profile. Metal, MetalFX and Metal far terrain unavailable.");
 	}
 
 	/**
@@ -59,9 +70,8 @@ public final class Profile {
 		System.out.println("[mcopt] mcopt: Distant Horizons detected, using OpenGL; mcopt's other optimizations stay on (-Dmcopt.metal=true overrides)");
 	}
 
-	private static void applyFlags() {
+	static void applyFlags(Path cfg) {
 		Properties file = new Properties();
-		Path cfg = gameDir().resolve("config").resolve("mcopt.properties");
 		if (Files.isRegularFile(cfg)) {
 			try (Reader r = Files.newBufferedReader(cfg, StandardCharsets.UTF_8)) {
 				file.load(r);
@@ -70,7 +80,7 @@ public final class Profile {
 			}
 		}
 		String name = System.getProperty("mcopt.profile", file.getProperty("profile", "")).trim();
-		if (name.isEmpty()) name = DEFAULT;
+		if (name.isEmpty()) name = Platform.windows() ? "windows" : DEFAULT;
 		if (!Files.exists(cfg)) writeDefault(cfg, name); // first launch: record the effective profile (none stays none)
 		Map<String, String> flags = new TreeMap<>();
 		if (!name.isEmpty() && !name.equals("none")) {
@@ -85,7 +95,7 @@ public final class Profile {
 				System.out.println("[mcopt] profile " + name + ": " + e);
 			}
 			p.stringPropertyNames().forEach(k -> flags.put(k, p.getProperty(k).trim()));
-			if (name.equals("alpha")) tier(flags);
+			if (name.equals("alpha") || name.equals("windows")) tier(flags);
 		}
 		file.stringPropertyNames().stream().filter(k -> k.startsWith("mcopt.")).forEach(k -> flags.put(k, file.getProperty(k).trim()));
 		if (flags.isEmpty()) return;
@@ -104,12 +114,14 @@ public final class Profile {
 
 	/** Small tier: GPU cores < 10 or RAM <= 8 GB, or either unreadable. Logs the tier and drops {@link #SMALL_OUT}. */
 	private static void tier(Map<String, String> flags) {
-		int cores = gpuCores();
+		int cores = Platform.windows() ? -1 : gpuCores();
 		long mem = memBytes();
-		boolean small = cores < 10 || mem <= 8L << 30;
+		boolean small = Platform.windows()
+			? mem < (16L << 30) || Runtime.getRuntime().maxMemory() < (2L << 30)
+			: cores < 10 || mem <= 8L << 30;
 		StringBuilder out = new StringBuilder();
 		if (small) for (String k : SMALL_OUT) if (flags.remove(k) != null) out.append(' ').append(k);
-		System.out.println("[mcopt] profile alpha: tier " + (small ? "small" : "full") + " (gpu cores "
+		System.out.println("[mcopt] profile: tier " + (small ? "small" : "full") + " (gpu cores "
 			+ (cores < 0 ? "unknown" : cores) + ", ram " + (mem < 0 ? "unknown" : String.format("%.1f GB", mem / (double) (1L << 30))) + ")"
 			+ (out.isEmpty() ? "" : "; left out:" + out));
 	}
@@ -121,6 +133,10 @@ public final class Profile {
 	}
 
 	private static long memBytes() {
+		if (Platform.windows()) {
+			var bean = java.lang.management.ManagementFactory.getOperatingSystemMXBean();
+			return bean instanceof com.sun.management.OperatingSystemMXBean os ? os.getTotalMemorySize() : -1;
+		}
 		try {
 			return Long.parseLong(run("/usr/sbin/sysctl", "-n", "hw.memsize").trim());
 		} catch (NumberFormatException e) {
@@ -131,8 +147,8 @@ public final class Profile {
 	private static String run(String... cmd) {
 		try {
 			Process p = new ProcessBuilder(cmd).redirectErrorStream(true).redirectInput(ProcessBuilder.Redirect.from(new java.io.File("/dev/null"))).start();
+			if (!p.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)) { p.destroyForcibly(); return ""; }
 			byte[] b = p.getInputStream().readAllBytes();
-			p.waitFor(5, java.util.concurrent.TimeUnit.SECONDS);
 			return new String(b, StandardCharsets.UTF_8);
 		} catch (Exception e) {
 			return "";
@@ -143,11 +159,11 @@ public final class Profile {
 		String text = """
 			# mcopt settings. Written on first launch; edit freely.
 			#
-			# profile=alpha: measured vanilla performance options (chunk meshing, render lists, startup), the default.
+			# profile=alpha (Mac) / windows (Windows): chunk meshing, render lists, memory and startup options.
 			# To turn it off:  profile=none
 			profile=%s
 			#
-			# Far terrain (EXPERIMENTAL, off by default; for Macs with 10 or more GPU cores): remove the # below.
+			# Far terrain (Mac ONLY, experimental; ignored on Windows): remove the # below.
 			#mcopt.lod=true
 			""".formatted(name);
 		try {

@@ -16,7 +16,11 @@ dependencies {
 	minecraft "com.mojang:minecraft:${minecraft_version}"
 	implementation "net.fabricmc:fabric-loader:${loader_version}"
 	compileOnly "maven.modrinth:sodium:${sodium_version}"
+	testImplementation "junit:junit:4.13.2"
 }
+
+def targetPlatform = providers.gradleProperty('targetPlatform').getOrElse(System.getProperty('os.name').startsWith('Windows') ? 'windows' : 'macos')
+if (!(targetPlatform in ['macos', 'windows'])) throw new GradleException('targetPlatform must be macos or windows')
 
 def nativeOut = layout.buildDirectory.dir('natives/natives')
 
@@ -31,14 +35,20 @@ tasks.register('compileNative', Exec) {
 }
 
 processResources {
+	if (targetPlatform == 'macos') {
 	dependsOn 'compileNative'
 	from(layout.buildDirectory.dir('natives'))
+	}
 	inputs.property 'version', version
 	filesMatching('fabric.mod.json') { expand 'version': version }
 }
 
 // Double-clicking the jar (java -jar) explains that it's a Fabric mod and how to install it.
 jar {
+	if (targetPlatform == 'windows') {
+		archiveBaseName = 'mcopt-windows'
+		exclude 'natives/**'
+	}
 	manifest { attributes 'Main-Class': 'mcopt.metal.InstallHelp', 'Implementation-Version': version }
 	// Apache-2.0 asks for LICENSE and NOTICE in every copy; LICENSES/ holds the other licences NOTICE refers to.
 	from(rootProject.file('LICENSE'))
@@ -51,4 +61,55 @@ tasks.withType(JavaCompile).configureEach {
 	// the far terrain's Vector API noise control (LodNoiseVector, opt-in -Dmcopt.lod.nativeNoise=vector): loaded only when the game runs with
 	// --add-modules jdk.incubator.vector
 	if (it.name == 'compileJava') it.options.compilerArgs += ['--add-modules', 'jdk.incubator.vector']
+}
+
+// Build an installable Windows jar, including the optional fps HUD through Fabric jar-in-jar.
+def windowsMeta = layout.buildDirectory.dir('windows-metadata')
+tasks.register('windowsMetadata') {
+	dependsOn tasks.named('processResources'), project(':fpshud').tasks.named('jar')
+	inputs.file layout.buildDirectory.file('resources/main/fabric.mod.json')
+	inputs.file project(':fpshud').tasks.named('jar').flatMap { it.archiveFile }
+	inputs.file rootProject.file('WINDOWS-README.txt')
+	inputs.property 'version', version
+	outputs.dir windowsMeta
+	doLast {
+		if (targetPlatform != 'windows') throw new GradleException('Use -PtargetPlatform=windows for a Windows release')
+		def directory = windowsMeta.get().asFile
+		directory.mkdirs()
+		def meta = new groovy.json.JsonSlurper().parse(layout.buildDirectory.file('resources/main/fabric.mod.json').get().asFile)
+		meta.jars = [[file: 'META-INF/jars/' + project(':fpshud').tasks.named('jar').get().archiveFile.get().asFile.name]]
+		new File(directory, 'fabric.mod.json').text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(meta))
+		new File(directory, 'README.txt').text = rootProject.file('WINDOWS-README.txt').text.replace('@VERSION@', version.toString())
+	}
+}
+
+tasks.register('windowsJar', Jar) {
+	dependsOn tasks.named('jar'), tasks.named('windowsMetadata')
+	archiveBaseName = 'mcopt-windows'
+	destinationDirectory = rootProject.layout.projectDirectory.dir('dist')
+	manifest { attributes 'Main-Class': 'mcopt.metal.InstallHelp', 'Implementation-Version': project.version }
+	from({ zipTree(tasks.named('jar').get().archiveFile.get().asFile) }) {
+		exclude 'fabric.mod.json', 'META-INF/MANIFEST.MF', 'natives/**'
+	}
+	from(windowsMeta) { include 'fabric.mod.json' }
+	from(project(':fpshud').tasks.named('jar').flatMap { it.archiveFile }) { into 'META-INF/jars' }
+}
+
+tasks.register('windowsRelease', Zip) {
+	dependsOn tasks.named('windowsJar')
+	archiveBaseName = 'mcopt-windows'
+	destinationDirectory = rootProject.layout.projectDirectory.dir('dist')
+	into("mcopt-windows-${version}") {
+		from(tasks.named('windowsJar').flatMap { it.archiveFile })
+		from(windowsMeta) { include 'README.txt' }
+		from(rootProject.file('LICENSE'))
+		from(rootProject.file('NOTICE'))
+		from(rootProject.file('LICENSES')) { into 'LICENSES' }
+	}
+}
+
+tasks.named('test') {
+	// Profile plugins may write first-launch config; keep it out of the checkout.
+	workingDir = layout.buildDirectory.dir('test-game').get().asFile
+	doFirst { workingDir.mkdirs() }
 }

@@ -31,6 +31,7 @@ public final class GenMixinPlugin implements IMixinConfigPlugin {
 
 	@Override
 	public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
+		if (!mcopt.metal.Platform.metalEnabled()) return false;
 		if (mixinClassName.endsWith(".GenWorldgenQosMixin")) return WORLDGEN_QOS;
 		if (mixinClassName.endsWith(".GenNoiseChunkMixin")) return NATIVE_NOISE;
 		return false;
