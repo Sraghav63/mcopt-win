@@ -1,0 +1,16 @@
+gradle.projectsEvaluated {
+ def p = gradle.rootProject.project(':metal')
+ p.tasks.named('runClient').configure {
+  jvmArgs '-Dmcopt.vulkan.testOtherPlatforms=true', '-Dmcopt.profile=windows', '-Dmcopt.metal=false', '-Dmcopt.preload=false', '--enable-native-access=ALL-UNNAMED', '-Dmixin.debug.export=true', '-Dmixin.debug.countInjections=true', '-Dmcopt.smoke=true', '-Dmcopt.vulkan.stats=true'
+  args '--demo', '--gameDir', p.layout.buildDirectory.dir('vulkan-smoke-game').get().asFile.absolutePath
+  dependsOn p.tasks.named('vulkanSmokeMod')
+  doFirst {
+   def mods = p.layout.buildDirectory.dir('vulkan-smoke-game/mods').get().asFile
+   mods.mkdirs()
+   p.copy { from p.tasks.named('vulkanSmokeMod').get().archiveFile; into mods }
+   def sodium = p.configurations.compileClasspath.files.find { it.name.startsWith('sodium-') && it.name.endsWith('.jar') }
+   if (sodium == null) throw new GradleException('Sodium compile dependency not found')
+   p.copy { from sodium; into mods; rename { 'sodium.jar' } }
+  }
+ }
+}

@@ -2,7 +2,7 @@ plugins {
 	id 'net.fabricmc.fabric-loom' version "${loom_version}"
 }
 
-version = '0.2.0-alpha.2'
+version = '0.2.0-alpha.3'
 
 repositories {
 	// Sodium at build time only (compileOnly): mcopt hooks into it at runtime and never bundles it.
@@ -17,6 +17,7 @@ dependencies {
 	implementation "net.fabricmc:fabric-loader:${loader_version}"
 	compileOnly "maven.modrinth:sodium:${sodium_version}"
 	testImplementation "junit:junit:4.13.2"
+	testRuntimeOnly "maven.modrinth:sodium:${sodium_version}"
 }
 
 def targetPlatform = providers.gradleProperty('targetPlatform').getOrElse(System.getProperty('os.name').startsWith('Windows') ? 'windows' : 'macos')
@@ -112,4 +113,17 @@ tasks.named('test') {
 	// Profile plugins may write first-launch config; keep it out of the checkout.
 	workingDir = layout.buildDirectory.dir('test-game').get().asFile
 	doFirst { workingDir.mkdirs() }
+}
+
+// Optional isolated client fixture: not included in main classes, release jars or normal builds.
+sourceSets {
+	smoke {
+		compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
+	}
+}
+tasks.named('compileSmokeJava') { dependsOn tasks.named('classes') }
+tasks.register('vulkanSmokeMod', Jar) {
+	dependsOn tasks.named('smokeClasses')
+	archiveBaseName = 'mcopt-vulkan-smoke'
+	from sourceSets.smoke.output
 }

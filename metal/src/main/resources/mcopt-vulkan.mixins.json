@@ -1,0 +1,8 @@
+{
+	"required": true,
+	"package": "mcopt.vulkan.mixin",
+	"plugin": "mcopt.vulkan.mixin.VulkanMixinPlugin",
+	"compatibilityLevel": "JAVA_25",
+	"client": ["GraphicsApiMixin", "VulkanDeviceMixin", "VulkanPipelineMixin", "VulkanRenderPassMixin", "VulkanMultiDrawBatchMixin", "VulkanIndirectBatchMixin"],
+	"injectors": { "defaultRequire": 1 }
+}

@@ -4,31 +4,48 @@ A Minecraft performance mod for Windows 11 and Apple Silicon Macs. **Very much a
 
 ## Windows 11
 
-The Windows port keeps the portable chunk, CPU, memory and startup optimizations and uses Windows thread scheduling.
-Minecraft/Sodium provides the graphics backend. **Matching the Mac performance gains is not established:** Apple's
-Metal renderer, MetalFX/frame generation, native noise and mcopt far terrain have no Windows equivalents in this port.
-Windows gameplay and hardware benchmarks still need validation.
+Windows now uses Minecraft 26.3's **native Vulkan renderer**, with mcopt optimizations for pipeline caching,
+GPU state bindings and Sodium terrain batches, alongside the portable CPU/chunk optimizations.
+OpenGL remains a fallback if Vulkan initialization fails. Windows FPS gains and parity with Metal are not established.
 
-Install `dist/mcopt-windows-0.2.0-alpha.2.jar` alongside the Sodium version below in `%APPDATA%\.minecraft\mods`
+Install `dist/mcopt-windows-0.2.0-alpha.3.jar` alongside the Sodium version below in `%APPDATA%\.minecraft\mods`
 (or your launcher's instance mods folder). Requires 64-bit Java 25+, Minecraft 26.3 and Fabric Loader 0.19.5+.
-The FPS HUD is included. Remove any previous mcopt or separate mcopt-fps jars first.
+Use a current Vulkan-capable GPU driver. The FPS HUD is included; remove previous mcopt or separate mcopt-fps jars.
 
-Build on Windows with JDK 25: `powershell -ExecutionPolicy Bypass -File tools/release-windows.ps1`, or:
+Build on Windows with JDK 25:
 
 ```powershell
-.\gradlew.bat -PtargetPlatform=windows :metal:build :fpshud:build :metal:windowsRelease
+.\tools\release-windows.ps1
 ```
 
-Cross-build on Mac/Linux using `./gradlew` with the same arguments. Both the jar and a zip with installation instructions
-are written to `dist/`. No Xcode, clang, Python or Apple frameworks are needed for this build.
+Or run `.\gradlew.bat -PtargetPlatform=windows :metal:build :fpshud:build :metal:windowsRelease`.
+Cross-build on Mac/Linux using `./gradlew` with the same arguments. The jar and installation zip are written to `dist/`.
+No Xcode, clang, Python or Vulkan SDK is needed for the Windows build; the game supplies its Vulkan bindings.
 
-Windows defaults to `profile=windows`. Its larger chunk cache is enabled only with at least 16 GB system memory and
-2 GB Java heap. Config and JVM overrides for portable optimizations still take precedence; Apple-only hooks stay off.
+Windows defaults to `profile=windows`. Its larger chunk cache needs at least 16 GB system memory and 2 GB Java heap.
+Config and JVM overrides take precedence for supported optimizations. Apple-only hooks remain disabled.
+
+`mcopt.graphics=auto` prefers Vulkan for the game's Default/Vulkan choices and respects an explicit OpenGL choice.
+Distant Horizons or Iris makes auto mode use OpenGL only. `mcopt.graphics=vulkan` explicitly selects Vulkan first;
+`mcopt.graphics=opengl` selects OpenGL first; `mcopt.graphics=vanilla` leaves the game's backend order alone.
+Restart after changes. The log says `Vulkan GPU path active` when the enhanced Vulkan path actually initializes.
+
+Windows profile enables these independently switchable optimizations:
+
+- `mcopt.vulkan.pipelineCache=true`: cache native pipeline compilation across launches, scoped by GPU and driver.
+- `mcopt.vulkan.stateCache=true`: skip repeated identical native pipeline/vertex/index binding commands within each pass.
+- `mcopt.vulkan.mergeDraws=true`: merge adjacent Sodium quad ranges for both Vulkan direct and indirect batches.
+
+The pipeline cache lives under `cache/mcopt/vulkan`, is size bounded, checksummed, and saved atomically on clean exit.
+It is optional: file/cache failures keep ordinary compilation. Delete that folder to reset it.
+Metal's split-pass occlusion, MetalFX/frame generation and mcopt far terrain are **not ported** by this Vulkan integration.
+
 `mcopt.qos=off` disables thread scheduling. Java may require `--enable-native-access=ALL-UNNAMED` for native scheduling;
-if unavailable, mcopt logs once and keeps default Windows priorities.
+if unavailable, mcopt logs once and keeps default Windows priorities. `profile=none` disables profile flags, including
+Vulkan optimizations; backend selection, QoS and class preload have separate controls.
 
-See [WINDOWS-README.txt](WINDOWS-README.txt) for installation and a controlled benchmark procedure. The table below
-contains Mac results only. `profile=none` disables profile settings; QoS and class preload have separate switches.
+See [WINDOWS-README.txt](WINDOWS-README.txt) for installation and benchmarking, and
+[the Vulkan verification report](docs/vulkan-validation.md) for checks and their limits. The table below is Mac data only.
 
 ## Mac requirements
 

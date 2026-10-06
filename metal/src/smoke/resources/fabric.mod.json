@@ -1,0 +1,1 @@
+{"schemaVersion":1,"id":"mcopt-vulkan-smoke","version":"1.0","environment":"client","mixins":["mcopt-smoke.mixins.json"],"depends":{"fabricloader":">=0.19.5","minecraft":"~26.3"}}

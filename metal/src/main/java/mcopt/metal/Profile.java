@@ -49,7 +49,7 @@ public final class Profile {
 		for (String key : java.util.List.of("mcopt.metal", "mcopt.lod", "mcopt.cpu.texelCache", "mcopt.preciseLimiter")) {
 			System.setProperty(key, "false");
 		}
-		System.out.println("[mcopt] Windows: using Minecraft/Sodium graphics backend; portable optimizations follow the selected profile. Metal, MetalFX and Metal far terrain unavailable.");
+		System.out.println("[mcopt] Windows: Vulkan preferred automatically (mcopt.graphics=opengl or vanilla overrides); portable optimizations follow the selected profile. Metal, MetalFX and Metal far terrain unavailable.");
 	}
 
 	/**
@@ -163,6 +163,8 @@ public final class Profile {
 			# To turn it off:  profile=none
 			profile=%s
 			#
+			# Windows graphics: auto prefers Vulkan, opengl forces OpenGL first, vanilla keeps the game's order.
+			#mcopt.graphics=auto
 			# Far terrain (Mac ONLY, experimental; ignored on Windows): remove the # below.
 			#mcopt.lod=true
 			""".formatted(name);
